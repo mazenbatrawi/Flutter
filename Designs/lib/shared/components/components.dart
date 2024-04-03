@@ -40,14 +40,18 @@ Widget defaultFormField({
   IconData? sufix,
   bool isPassword = false,
   void Function()? suffixPressed,
+  void Function()? onTap,
+  bool isClickable = true,
 }) 
   => TextFormField(
+    onTap: onTap,
     obscureText: isPassword,
     controller: controller,
     onFieldSubmitted: onSubmit,
     onChanged: onChanged,
     keyboardType: textInputType,
     cursorColor: Colors.blue,
+    enabled: isClickable,
     decoration: InputDecoration(
       labelText: label,
       floatingLabelStyle: TextStyle(

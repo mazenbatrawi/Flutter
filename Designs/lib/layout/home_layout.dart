@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:projects/modules/archived_tasks/archived_tasks_screen.dart';
 import 'package:projects/modules/done_tasks/done_tasks_screen.dart';
 import 'package:projects/modules/new_tasks/new_tasks_screen.dart';
+import 'package:projects/shared/components/components.dart';
 import 'package:sqflite/sqflite.dart';
 
 class HomeLayout extends StatefulWidget {
@@ -13,6 +15,13 @@ class HomeLayout extends StatefulWidget {
 
 class _HomeLayoutState extends State<HomeLayout> {
   int currentIndex = 0;
+  late Database  database;
+  var scaffoldKey = GlobalKey<ScaffoldState>();
+  var formKey = GlobalKey<FormState>();
+  bool isBottomSheetShown = false;
+  var titleController = TextEditingController();
+  var timeController = TextEditingController();
+  var dateController = TextEditingController();
 
   List<Widget> screens = [
     NewTasksScreen(),
@@ -35,6 +44,7 @@ class _HomeLayoutState extends State<HomeLayout> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: scaffoldKey,
       appBar: AppBar(
         backgroundColor: Colors.blue,
         title: Text(
@@ -45,13 +55,108 @@ class _HomeLayoutState extends State<HomeLayout> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        isExtended: true,
         onPressed: () {
-
+          if(isBottomSheetShown){
+            if(formKey.currentState!.validate()){
+              insertToDatabase(
+                title: titleController.text,
+                date: dateController.text,
+                time: timeController.text,
+              ).then((value) {
+                Navigator.pop(context);
+                setState(() {
+                  isBottomSheetShown = false;
+                });
+              });
+            }
+          }
+          else{
+            scaffoldKey.currentState!.showBottomSheet((context) => 
+              Container(
+                color: Colors.grey[100],
+                padding: EdgeInsets.all(20.0),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      defaultFormField(
+                        controller: titleController,
+                        textInputType: TextInputType.text,
+                        validate: (value) {
+                          if(value != null && value.isEmpty){
+                            return 'Title must not be empty';
+                          }
+                          return null;
+                        },
+                        label: 'Task Title',
+                        prefix: Icons.title,
+                      ),
+                      SizedBox(
+                        height: 15.0,
+                      ),
+                      defaultFormField(
+                        controller: timeController,
+                        textInputType: TextInputType.none,
+                        onTap: () {
+                          showTimePicker(
+                            context: context, 
+                            initialTime: TimeOfDay.now(),
+                          ).then((value) {
+                            timeController.text = value!.format(context).toString();
+                          });
+                        },
+                        validate: (value) {
+                          if(value != null && value.isEmpty){
+                            return 'Time must not be empty';
+                          }
+                          return null;
+                        },
+                        label: 'Task Time',
+                        prefix: Icons.watch_later_outlined,
+                      ),
+                      SizedBox(
+                        height: 15.0,
+                      ),
+                      defaultFormField(
+                        controller: dateController,
+                        textInputType: TextInputType.none,
+                        onTap: () {
+                          showDatePicker(
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.parse('21000101'),
+                            context: context, 
+                            initialDate: DateTime.now(),
+                          ).then((value) {
+                            if(value != null){
+                              dateController.text = DateFormat.yMMMd().format(value);
+                            }
+                          });
+                        },
+                        validate: (value) {
+                          if(value != null && value.isEmpty){
+                            return 'Date must not be empty';
+                          }
+                          return null;
+                        },
+                        label: 'Task Date',
+                        prefix: Icons.calendar_today,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+            setState(() {
+              isBottomSheetShown = true;
+            });
+          }
         },
         backgroundColor: Colors.blue,
         shape: CircleBorder(),
         child: Icon(
-          Icons.add,
+          isBottomSheetShown ? Icons.add : Icons.edit,
           color: Colors.white,
         ),
       ),
@@ -91,7 +196,7 @@ class _HomeLayoutState extends State<HomeLayout> {
   }
 
   void createDatabase() async {
-    var  database = await openDatabase(
+    database = await openDatabase(
       'todo.db',
       version: 1,
       onCreate: (database, version) {
@@ -110,8 +215,21 @@ class _HomeLayoutState extends State<HomeLayout> {
     );
   }
 
-  void insertToDatabase() {
-
+  Future insertToDatabase({
+    required String title,
+    required String time,
+    required String date,
+  }) async {
+    return await database.transaction((txn) {
+      txn.rawInsert(
+        'INSERT INTO tasks (title, date, time, status) VALUES ("$title", "$date", "$time", "new")'
+      ).then((value) {
+        print('${value} Inserted successfully');
+      }).catchError((error) {
+        print('Error while inserting ${error.toString()}');
+      });
+      return Future(() => null);
+    });
   }
 
 }
